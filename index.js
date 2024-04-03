@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, MessageAttachment } = require('discord.js');
+const { Client, GatewayIntentBits } = require('discord.js');
 const { Hercai } = require('hercai');
 const Tesseract = require('tesseract.js');
 const fetch = require('node-fetch');
@@ -14,7 +14,7 @@ const client = new Client({
 });
 
 client.once('ready', () => {
-  console.log(`bot is ready! ${client.user.tag}!`);
+  console.log(`Bot is ready! ${client.user.tag}!`);
   console.log(`Code by Wick Studio`);
   console.log(`discord.gg/wicks`);
 });
@@ -25,37 +25,43 @@ async function extractTextFromImage(url) {
     const textFromImage = await Tesseract.recognize(image, 'eng');
     return textFromImage.data.text;
   } catch (error) {
-    return "Error "
+    throw new Error('Failed to extract text from the image.');
   }
 }
 
 client.on('messageCreate', async message => {
-  if (message.author.bot || !allowed_channel_ids.includes(message.channel.id) && !image2textChannels.includes(message.channel.id)) return;
+  if (message.author.bot) return;
+
+  const isAllowedChannel = allowed_channel_ids.includes(message.channel.id);
+  const isImageChannel = image2textChannels.includes(message.channel.id);
+
+  if (!isAllowedChannel && !isImageChannel) return;
 
   let fullContent = message.content;
 
-  if (message.attachments.size > 0 && image2textChannels.includes(message.channel.id)) {
+  if (message.attachments.size > 0 && isImageChannel) {
     const attachment = message.attachments.first();
     if (attachment.contentType && attachment.contentType.startsWith('image/')) {
       try {
         const extractedText = await extractTextFromImage(attachment.url);
         await message.reply(`Extracted Text: ${extractedText}`);
       } catch (error) {
+        console.error(error);
         await message.reply('Sorry, I had trouble reading that image.');
       }
     }
     return;
   }
 
-  if (message.attachments.size > 0 && allowed_channel_ids.includes(message.channel.id)) {
+  if (message.attachments.size > 0 && isAllowedChannel) {
     const attachment = message.attachments.first();
     if (attachment.contentType && attachment.contentType.startsWith('image/')) {
       try {
         const textFromImage = await extractTextFromImage(attachment.url);
         fullContent += ` [Image Content: ${textFromImage}]`;
       } catch (error) {
+        console.error(error);
         await message.reply('Sorry, I had trouble reading that image.');
-        return;
       }
     }
   }
@@ -64,10 +70,9 @@ client.on('messageCreate', async message => {
     const response = await herc.question({ model: "v3-beta", content: fullContent });
     await message.reply(response.reply);
   } catch (error) {
+    console.error(error);
     await message.reply('Sorry, I ran into a bit of trouble trying to respond.');
   }
 });
-
-
 
 client.login(token);
